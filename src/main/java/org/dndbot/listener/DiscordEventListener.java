@@ -28,6 +28,7 @@ public class DiscordEventListener extends ListenerAdapter {
         if (g != null) {
             CommandListUpdateAction commands = g.updateCommands();
             commands.addCommands(Commands.slash("hello", "Have the bot say hello to you in an ephemeral message!")).queue();
+            commands.addCommands(Commands.slash("d20", "Roll a d20")).queue();
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
         }
@@ -38,6 +39,10 @@ public class DiscordEventListener extends ListenerAdapter {
         if (event.getName().equals("hello")) { // Is the command name "hello"?
             event.reply("Hello " + event.getUser().getAsMention() + "!") // What will we reply with?
                     .setEphemeral(true) // Do we want the message hidden so only the user who ran the command can see it?
+                    .queue(); // Queue the reply.
+        }
+        if (event.getName().equals("d20")) {
+            event.reply("Your d20 roll is: " + ((int)(Math.random() * 20)+ 1)) // What will we reply with?
                     .queue(); // Queue the reply.
         }
     }
