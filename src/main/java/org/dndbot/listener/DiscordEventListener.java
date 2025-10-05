@@ -20,6 +20,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import net.dv8tion.jda.api.interactions.components.buttons.Button;
+import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 
 public class DiscordEventListener extends ListenerAdapter {
     public DnDBot bot;
@@ -50,6 +52,12 @@ public class DiscordEventListener extends ListenerAdapter {
             commands.addCommands(Commands.slash("getitem", "Get information about a D&D item")
                     .addOptions(new OptionData(OptionType.STRING, "item", "Name of the item", true)))
                     .queue();
+            commands.addCommands(Commands.slash("additem", "Add an item to a character's inventory")
+                    .addOptions(
+                            new OptionData(OptionType.STRING, "charname", "Name of your character", true),
+                            new OptionData(OptionType.STRING, "item", "Name of the item to add", true)
+                    )
+            ).queue();
 
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
@@ -117,6 +125,35 @@ public class DiscordEventListener extends ListenerAdapter {
                     eb.addField("Intelligence", String.valueOf(c.getIntelligence()), true);
                     eb.addField("Wisdom", String.valueOf(c.getWisdom()), true);
                     eb.addField("Charisma", String.valueOf(c.getCharisma()), true);
+                    // Inventory display
+                    List<String> inv = c.getInventory();
+                    if (inv != null && !inv.isEmpty()) {
+                        StringBuilder invList = new StringBuilder();
+                        for (String item : inv) {
+                            invList.append(item).append("\n");
+                        }
+                        eb.addField("Inventory", invList.toString().trim(), false);
+                        // Add buttons for each item (max 5 per row, Discord limit is 5 per row, 25 total)
+                        List<Button> buttons = new ArrayList<>();
+                        int btnCount = 0;
+                        for (String item : inv) {
+                            if (btnCount >= 25) break;
+                            // Custom ID: getitem:<charName>:<itemName>
+                            String customId = "getitem:" + c.getName() + ":" + item;
+                            // Discord custom ID max length is 100, so truncate if needed
+                            if (customId.length() > 100) customId = customId.substring(0, 100);
+                            buttons.add(Button.primary(customId, item));
+                            btnCount++;
+                        }
+                        // Send embed with buttons
+                        event.replyEmbeds(eb.build())
+                            .addActionRow(buttons.subList(0, Math.min(5, buttons.size())))
+                            .queue();
+                        // If more than 5, add more rows (not supported in this simple code, but can be added if needed)
+                        return;
+                    } else {
+                        eb.addField("Inventory", "(empty)", false);
+                    }
                     event.replyEmbeds(eb.build()).queue();
                 } else {
                     event.reply("Character not found or you do not own this character.").setEphemeral(true).queue();
@@ -128,126 +165,43 @@ public class DiscordEventListener extends ListenerAdapter {
         }
         if (event.getName().equals("getitem")) {
             String itemName = event.getOption("item").getAsString();
-            org.json.JSONObject item = DnDAPI.getItem(itemName);
-            if (item != null && !item.has("error")) {
-                net.dv8tion.jda.api.EmbedBuilder eb = new net.dv8tion.jda.api.EmbedBuilder();
-                eb.setTitle(item.optString("name", "Unknown Item"));
-                String category = item.has("equipment_category") ? item.getJSONObject("equipment_category").optString("name", "-") : "-";
-                String gearCategory = item.has("gear_category") ? item.getJSONObject("gear_category").optString("name", "-") : "-";
-                String cost = item.has("cost") ? (item.getJSONObject("cost").optInt("quantity", 0) + " " + item.getJSONObject("cost").optString("unit", "")) : "-";
-                String weight = item.has("weight") ? String.valueOf(item.get("weight")) : "-";
-                String desc = "-";
-                if (item.has("desc")) {
-                    org.json.JSONArray descArr = item.getJSONArray("desc");
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < descArr.length(); i++) {
-                        sb.append(descArr.getString(i)).append("\n");
+            net.dv8tion.jda.api.EmbedBuilder eb = getItemEmbed(itemName);
+            event.replyEmbeds(eb.build()).queue();
+        }
+        if (event.getName().equals("additem")) {
+            String charName = event.getOption("charname").getAsString();
+            String itemName = event.getOption("item").getAsString();
+            Long userId = event.getUser().getIdLong();
+            ObjectMapper mapper = new ObjectMapper();
+            Path filePath = Paths.get("characters.json");
+            List<DnDChar> characters = new ArrayList<>();
+            try {
+                if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                    characters = mapper.readValue(filePath.toFile(), new com.fasterxml.jackson.core.type.TypeReference<List<DnDChar>>() {});
+                }
+                Optional<DnDChar> found = characters.stream()
+                        .filter(c -> c.getName().equalsIgnoreCase(charName) && c.getUserId() == userId)
+                        .findFirst();
+                if (found.isPresent()) {
+                    // Check if item exists in DnDAPI
+                    org.json.JSONObject item = DnDAPI.getItem(itemName);
+                    if (item != null && !item.has("error")) {
+                        DnDChar c = found.get();
+                        List<String> inv = c.getInventory();
+                        inv.add(item.optString("name", itemName));
+                        c.setInventory(inv);
+                        // Save updated characters list
+                        mapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), characters);
+                        event.reply("Added '" + item.optString("name", itemName) + "' to " + c.getName() + "'s inventory.").queue();
+                    } else {
+                        event.reply("Item not found: '" + itemName + "'. Please check the spelling and try again.").setEphemeral(true).queue();
                     }
-                    desc = sb.toString().trim();
-                }
-                eb.addField("Category", category, true);
-                if (!gearCategory.equals("-")) eb.addField("Gear Category", gearCategory, true);
-                eb.addField("Cost", cost, true);
-                eb.addField("Weight", weight, true);
-                // Weapon-specific fields
-                if (item.has("weapon_category")) {
-                    eb.addField("Weapon Category", item.optString("weapon_category", "-"), true);
-                }
-                if (item.has("weapon_range")) {
-                    eb.addField("Weapon Range", item.optString("weapon_range", "-"), true);
-                }
-                if (item.has("category_range")) {
-                    eb.addField("Category Range", item.optString("category_range", "-"), true);
-                }
-                if (item.has("damage")) {
-                    org.json.JSONObject dmg = item.getJSONObject("damage");
-                    String dmgStr = dmg.optString("damage_dice", "-");
-                    String dmgType = dmg.has("damage_type") ? dmg.getJSONObject("damage_type").optString("name", "-") : "-";
-                    eb.addField("Damage", dmgStr, true);
-                    eb.addField("Damage Type", dmgType, true);
-                }
-                if (item.has("range")) {
-                    org.json.JSONObject range = item.getJSONObject("range");
-                    String normal = range.has("normal") ? String.valueOf(range.get("normal")) : "-";
-                    String longR = range.has("long") ? String.valueOf(range.get("long")) : "-";
-                    eb.addField("Range", "Normal: " + normal + ", Long: " + longR, true);
-                }
-                if (item.has("properties")) {
-                    org.json.JSONArray props = item.getJSONArray("properties");
-                    if (props.length() > 0) {
-                        StringBuilder propList = new StringBuilder();
-                        for (int i = 0; i < props.length(); i++) {
-                            propList.append(props.getJSONObject(i).optString("name", "-"));
-                            if (i < props.length() - 1) propList.append(", ");
-                        }
-                        eb.addField("Properties", propList.toString(), false);
-                    }
-                }
-                if (item.has("vehicle_category")) {
-                    eb.addField("Vehicle Category", item.optString("vehicle_category", "-"), true);
-                }
-                if (item.has("speed")) {
-                    org.json.JSONObject speed = item.getJSONObject("speed");
-                    String speedStr = speed.optInt("quantity", 0) + " " + speed.optString("unit", "");
-                    eb.addField("Speed", speedStr, true);
-                }
-                if (item.has("capacity")) {
-                    eb.addField("Capacity", item.optString("capacity", "-"), true);
-                }
-                if (item.has("rarity")) {
-                    org.json.JSONObject rarity = item.getJSONObject("rarity");
-                    eb.addField("Rarity", rarity.optString("name", "-"), true);
-                }
-
-                if (item.has("image")) {
-                    String imageUrl = item.optString("image", null);
-                    if (imageUrl != null && !imageUrl.isEmpty()) {
-                        // Prepend the DnD 5e API base URL if needed
-                        if (imageUrl.startsWith("/")) {
-                            imageUrl = "https://www.dnd5eapi.co" + imageUrl;
-                        }
-                        eb.setThumbnail(imageUrl);
-                    }
-                }
-
-                // Description field (split at line breaks for seamless continuation)
-                final int FIELD_LIMIT = 1024;
-                if (desc.length() <= FIELD_LIMIT) {
-                    eb.addField("Description", desc, false);
                 } else {
-                    // Split at line breaks, grouping lines into chunks <= FIELD_LIMIT
-                    List<String> lines = Arrays.asList(desc.split("\n"));
-                    StringBuilder chunkBuilder = new StringBuilder();
-                    for (int i = 0; i < lines.size(); i++) {
-                        String line = lines.get(i);
-                        // +1 for the line break if not the first line
-                        int extra = chunkBuilder.length() > 0 ? 1 : 0;
-                        if (chunkBuilder.length() + line.length() + extra > FIELD_LIMIT) {
-                            // Add the chunk as a field
-                            if (eb.getFields().isEmpty()) {
-                                eb.addField("Description", chunkBuilder.toString(), false);
-                            } else {
-                                eb.addField("", chunkBuilder.toString(), false);
-                            }
-                            chunkBuilder = new StringBuilder();
-                        }
-                        if (chunkBuilder.length() > 0) chunkBuilder.append("\n");
-                        chunkBuilder.append(line);
-                    }
-                    // Add any remaining chunk
-                    if (chunkBuilder.length() > 0) {
-                        if (eb.getFields().isEmpty()) {
-                            eb.addField("Description", chunkBuilder.toString(), false);
-                        } else {
-                            eb.addField("", chunkBuilder.toString(), false);
-                        }
-                    }
+                    event.reply("Character not found or you do not own this character.").setEphemeral(true).queue();
                 }
-
-                event.replyEmbeds(eb.build()).queue();
-            } else {
-                String errorMsg = item != null && item.has("error") ? item.getString("error") : "Item not found. Please check the item name and try again.";
-                event.reply(errorMsg).setEphemeral(true).queue();
+            } catch (IOException e) {
+                e.printStackTrace();
+                event.reply("Failed to add item: " + e.getMessage()).queue();
             }
         }
 
@@ -257,4 +211,132 @@ public class DiscordEventListener extends ListenerAdapter {
             .map(name -> new Command.Choice(name, name))
             .toArray(Command.Choice[]::new);
 
+    @Override
+    public void onButtonInteraction(ButtonInteractionEvent event) {
+        String id = event.getComponentId();
+        if (id.startsWith("getitem:")) {
+            String[] parts = id.split(":", 3);
+            if (parts.length == 3) {
+                String itemName = parts[2];
+                net.dv8tion.jda.api.EmbedBuilder eb = getItemEmbed(itemName);
+                event.replyEmbeds(eb.build()).setEphemeral(true).queue();
+            }
+        }
+    }
+
+    private net.dv8tion.jda.api.EmbedBuilder getItemEmbed(String itemName) {
+        org.json.JSONObject item = DnDAPI.getItem(itemName);
+        net.dv8tion.jda.api.EmbedBuilder eb = new net.dv8tion.jda.api.EmbedBuilder();
+        if (item == null || item.has("error")) {
+            eb.setTitle("Item not found");
+            eb.setDescription("Item not found. Please check the item name and try again.");
+            return eb;
+        }
+        eb.setTitle(item.optString("name", "Unknown Item"));
+        String category = item.has("equipment_category") ? item.getJSONObject("equipment_category").optString("name", "-") : "-";
+        String gearCategory = item.has("gear_category") ? item.getJSONObject("gear_category").optString("name", "-") : "-";
+        String cost = item.has("cost") ? (item.getJSONObject("cost").optInt("quantity", 0) + " " + item.getJSONObject("cost").optString("unit", "")) : "-";
+        String weight = item.has("weight") ? String.valueOf(item.get("weight")) : "-";
+        String desc = "-";
+        if (item.has("desc")) {
+            org.json.JSONArray descArr = item.getJSONArray("desc");
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < descArr.length(); i++) {
+                sb.append(descArr.getString(i)).append("\n");
+            }
+            desc = sb.toString().trim();
+        }
+        eb.addField("Category", category, true);
+        if (!gearCategory.equals("-")) eb.addField("Gear Category", gearCategory, true);
+        eb.addField("Cost", cost, true);
+        eb.addField("Weight", weight, true);
+        if (item.has("weapon_category")) {
+            eb.addField("Weapon Category", item.optString("weapon_category", "-"), true);
+        }
+        if (item.has("weapon_range")) {
+            eb.addField("Weapon Range", item.optString("weapon_range", "-"), true);
+        }
+        if (item.has("category_range")) {
+            eb.addField("Category Range", item.optString("category_range", "-"), true);
+        }
+        if (item.has("damage")) {
+            org.json.JSONObject dmg = item.getJSONObject("damage");
+            String dmgStr = dmg.optString("damage_dice", "-");
+            String dmgType = dmg.has("damage_type") ? dmg.getJSONObject("damage_type").optString("name", "-") : "-";
+            eb.addField("Damage", dmgStr, true);
+            eb.addField("Damage Type", dmgType, true);
+        }
+        if (item.has("range")) {
+            org.json.JSONObject range = item.getJSONObject("range");
+            String normal = range.has("normal") ? String.valueOf(range.get("normal")) : "-";
+            String longR = range.has("long") ? String.valueOf(range.get("long")) : "-";
+            eb.addField("Range", "Normal: " + normal + ", Long: " + longR, true);
+        }
+        if (item.has("properties")) {
+            org.json.JSONArray props = item.getJSONArray("properties");
+            if (props.length() > 0) {
+                StringBuilder propList = new StringBuilder();
+                for (int i = 0; i < props.length(); i++) {
+                    propList.append(props.getJSONObject(i).optString("name", "-"));
+                    if (i < props.length() - 1) propList.append(", ");
+                }
+                eb.addField("Properties", propList.toString(), false);
+            }
+        }
+        if (item.has("vehicle_category")) {
+            eb.addField("Vehicle Category", item.optString("vehicle_category", "-"), true);
+        }
+        if (item.has("speed")) {
+            org.json.JSONObject speed = item.getJSONObject("speed");
+            String speedStr = speed.optInt("quantity", 0) + " " + speed.optString("unit", "");
+            eb.addField("Speed", speedStr, true);
+        }
+        if (item.has("capacity")) {
+            eb.addField("Capacity", item.optString("capacity", "-"), true);
+        }
+        if (item.has("rarity")) {
+            org.json.JSONObject rarity = item.getJSONObject("rarity");
+            eb.addField("Rarity", rarity.optString("name", "-"), true);
+        }
+        if (item.has("image")) {
+            String imageUrl = item.optString("image", null);
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                if (imageUrl.startsWith("/")) {
+                    imageUrl = "https://www.dnd5eapi.co" + imageUrl;
+                }
+                eb.setThumbnail(imageUrl);
+            }
+        }
+        // Description field (split at line breaks for seamless continuation)
+        final int FIELD_LIMIT = 1024;
+        if (desc.length() <= FIELD_LIMIT) {
+            eb.addField("Description", desc, false);
+        } else {
+            List<String> lines = Arrays.asList(desc.split("\n"));
+            StringBuilder chunkBuilder = new StringBuilder();
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                int extra = chunkBuilder.length() > 0 ? 1 : 0;
+                if (chunkBuilder.length() + line.length() + extra > FIELD_LIMIT) {
+                    if (eb.getFields().isEmpty()) {
+                        eb.addField("Description", chunkBuilder.toString(), false);
+                    } else {
+                        eb.addField("", chunkBuilder.toString(), false);
+                    }
+                    chunkBuilder = new StringBuilder();
+                }
+                if (chunkBuilder.length() > 0) chunkBuilder.append("\n");
+                chunkBuilder.append(line);
+            }
+            if (chunkBuilder.length() > 0) {
+                if (eb.getFields().isEmpty()) {
+                    eb.addField("Description", chunkBuilder.toString(), false);
+                } else {
+                    eb.addField("", chunkBuilder.toString(), false);
+                }
+            }
+        }
+        return eb;
+    }
 }
+

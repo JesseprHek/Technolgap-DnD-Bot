@@ -1,5 +1,8 @@
 package org.dndbot.character;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class DnDChar {
     private String name;
     private String DnDClass;
@@ -7,7 +10,11 @@ public class DnDChar {
 
     private int strength, dexterity, constitution, intelligence, wisdom, charisma;
 
-    public DnDChar() {}
+    private List<String> inventory;
+
+    public DnDChar() {
+        inventory = new ArrayList<>();
+    }
 
     public DnDChar(String name, String DnDClass, long DiscordID) {
         this.name = name;
@@ -20,6 +27,7 @@ public class DnDChar {
         intelligence = 10;
         wisdom = 10;
         charisma = 10;
+        inventory = new ArrayList<>();
     }
 
     public DnDChar(String name, String DnDClass, long UserId, int strength, int dexterity, int constitution, int intelligence, int wisdom, int charisma) {
@@ -32,6 +40,7 @@ public class DnDChar {
         this.intelligence = intelligence;
         this.wisdom = wisdom;
         this.charisma = charisma;
+        inventory = new ArrayList<>();
     }
 
     public String getName() {
@@ -70,6 +79,10 @@ public class DnDChar {
         return charisma;
     }
 
+    public List<String> getInventory() {
+        return inventory;
+    }
+
     public void setName(String name) {
         this.name = name;
     }
@@ -104,5 +117,9 @@ public class DnDChar {
 
     public void setCharisma(int charisma) {
         this.charisma = charisma;
+    }
+
+    public void setInventory(List<String> inventory) {
+        this.inventory = inventory;
     }
 }
