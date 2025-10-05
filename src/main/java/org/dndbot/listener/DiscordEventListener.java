@@ -58,6 +58,19 @@ public class DiscordEventListener extends ListenerAdapter {
                             new OptionData(OptionType.STRING, "item", "Name of the item to add", true)
                     )
             ).queue();
+            commands.addCommands(Commands.slash("setstat", "Set a main stat for a character")
+                    .addOptions(
+                            new OptionData(OptionType.STRING, "charname", "Name of your character", true),
+                            new OptionData(OptionType.STRING, "stat", "Stat to change", true)
+                                    .addChoice("Strength", "strength")
+                                    .addChoice("Dexterity", "dexterity")
+                                    .addChoice("Constitution", "constitution")
+                                    .addChoice("Intelligence", "intelligence")
+                                    .addChoice("Wisdom", "wisdom")
+                                    .addChoice("Charisma", "charisma"),
+                            new OptionData(OptionType.INTEGER, "value", "New value for the stat", true)
+                    )
+            ).queue();
 
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
@@ -204,6 +217,44 @@ public class DiscordEventListener extends ListenerAdapter {
                 event.reply("Failed to add item: " + e.getMessage()).queue();
             }
         }
+        if (event.getName().equals("setstat")) {
+            String charName = event.getOption("charname").getAsString();
+            String stat = event.getOption("stat").getAsString();
+            int value = event.getOption("value").getAsInt();
+            Long userId = event.getUser().getIdLong();
+            ObjectMapper mapper = new ObjectMapper();
+            Path filePath = Paths.get("characters.json");
+            List<DnDChar> characters = new ArrayList<>();
+            try {
+                if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                    characters = mapper.readValue(filePath.toFile(), new com.fasterxml.jackson.core.type.TypeReference<List<DnDChar>>() {});
+                }
+                Optional<DnDChar> found = characters.stream()
+                        .filter(c -> c.getName().equalsIgnoreCase(charName) && c.getUserId() == userId)
+                        .findFirst();
+                if (found.isPresent()) {
+                    DnDChar c = found.get();
+                    switch (stat.toLowerCase()) {
+                        case "strength": c.setStrength(value); break;
+                        case "dexterity": c.setDexterity(value); break;
+                        case "constitution": c.setConstitution(value); break;
+                        case "intelligence": c.setIntelligence(value); break;
+                        case "wisdom": c.setWisdom(value); break;
+                        case "charisma": c.setCharisma(value); break;
+                        default:
+                            event.reply("Invalid stat name.").setEphemeral(true).queue();
+                            return;
+                    }
+                    mapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), characters);
+                    event.reply("Set " + stat + " to " + value + " for " + c.getName() + ".").queue();
+                } else {
+                    event.reply("Character not found or you do not own this character.").setEphemeral(true).queue();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                event.reply("Failed to set stat: " + e.getMessage()).queue();
+            }
+        }
 
     }
     String[] classNames = DnDAPI.getClassNames();
@@ -339,4 +390,3 @@ public class DiscordEventListener extends ListenerAdapter {
         return eb;
     }
 }
-
