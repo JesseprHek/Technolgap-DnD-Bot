@@ -198,6 +198,7 @@ public class DiscordEventListener extends ListenerAdapter {
                     org.json.JSONObject rarity = item.getJSONObject("rarity");
                     eb.addField("Rarity", rarity.optString("name", "-"), true);
                 }
+
                 if (item.has("image")) {
                     String imageUrl = item.optString("image", null);
                     if (imageUrl != null && !imageUrl.isEmpty()) {
@@ -208,7 +209,41 @@ public class DiscordEventListener extends ListenerAdapter {
                         eb.setThumbnail(imageUrl);
                     }
                 }
-                eb.addField("Description", desc, false);
+
+                // Description field (split at line breaks for seamless continuation)
+                final int FIELD_LIMIT = 1024;
+                if (desc.length() <= FIELD_LIMIT) {
+                    eb.addField("Description", desc, false);
+                } else {
+                    // Split at line breaks, grouping lines into chunks <= FIELD_LIMIT
+                    List<String> lines = Arrays.asList(desc.split("\n"));
+                    StringBuilder chunkBuilder = new StringBuilder();
+                    for (int i = 0; i < lines.size(); i++) {
+                        String line = lines.get(i);
+                        // +1 for the line break if not the first line
+                        int extra = chunkBuilder.length() > 0 ? 1 : 0;
+                        if (chunkBuilder.length() + line.length() + extra > FIELD_LIMIT) {
+                            // Add the chunk as a field
+                            if (eb.getFields().isEmpty()) {
+                                eb.addField("Description", chunkBuilder.toString(), false);
+                            } else {
+                                eb.addField("", chunkBuilder.toString(), false);
+                            }
+                            chunkBuilder = new StringBuilder();
+                        }
+                        if (chunkBuilder.length() > 0) chunkBuilder.append("\n");
+                        chunkBuilder.append(line);
+                    }
+                    // Add any remaining chunk
+                    if (chunkBuilder.length() > 0) {
+                        if (eb.getFields().isEmpty()) {
+                            eb.addField("Description", chunkBuilder.toString(), false);
+                        } else {
+                            eb.addField("", chunkBuilder.toString(), false);
+                        }
+                    }
+                }
+
                 event.replyEmbeds(eb.build()).queue();
             } else {
                 String errorMsg = item != null && item.has("error") ? item.getString("error") : "Item not found. Please check the item name and try again.";
