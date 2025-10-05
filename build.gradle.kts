@@ -24,6 +24,7 @@ dependencies {
     implementation("commons-cli:commons-cli:1.5.0")
 
     implementation ("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+    implementation ("org.json:json:20230227")
 
 }
 

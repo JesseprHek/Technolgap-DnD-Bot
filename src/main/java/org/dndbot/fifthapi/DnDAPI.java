@@ -4,12 +4,20 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class DnDAPI {
 
     public static void main(String[] args) {
         System.out.println(getClass("WIZARD"));
 
+    }
+    public static String[] getAllClasses() {
+        String jsonData = getInfo("classes");
+        // You can now use jsonData as needed
+        // This will return a JSON string containing all classes
+        return new String[]{jsonData};
     }
 
     public static String getClass(String className) {
@@ -41,5 +49,18 @@ public class DnDAPI {
             e.printStackTrace();
         }
         return ("Item not found at path: " + path + ". Please check the spelling and try again.");
+    }
+
+
+
+    public static String[] getClassNames() {
+        String jsonData = getInfo("classes");
+        JSONObject jsonObject = new JSONObject(jsonData);
+        JSONArray results = jsonObject.getJSONArray("results");
+        String[] names = new String[results.length()];
+        for (int i = 0; i < results.length(); i++) {
+            names[i] = results.getJSONObject(i).getString("name");
+        }
+        return names;
     }
 }

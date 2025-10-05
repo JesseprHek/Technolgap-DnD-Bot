@@ -4,12 +4,14 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.commands.Command;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import net.dv8tion.jda.api.sharding.ShardManager;
 import org.dndbot.character.DnDChar;
+import org.dndbot.fifthapi.DnDAPI;
 import org.jetbrains.annotations.NotNull;
 import org.dndbot.DnDBot;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,8 +42,10 @@ public class DiscordEventListener extends ListenerAdapter {
             commands.addCommands(Commands.slash("d20", "Roll a d20")).queue();
             commands.addCommands(Commands.slash("addchar", "Add a character")
                     .addOptions(new OptionData(OptionType.STRING, "name", "Name your character", true),
-                            new OptionData(OptionType.STRING, "class", "Give your character a class", true)))
+                            new OptionData(OptionType.STRING, "class", "Give your character a class", true).addChoices(classChoices)))
                     .queue();
+            commands.addCommands(Commands.slash("getinfo", "Get info on an item")
+                    .addOptions(new OptionData(OptionType.STRING, "type", "Info to retrieve", true))).queue();
 
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
@@ -85,5 +89,13 @@ public class DiscordEventListener extends ListenerAdapter {
             }
 
         }
+        if (event.getName().equals("getinfo")){
+
+        }
     }
+    String[] classNames = DnDAPI.getClassNames();
+    Command.Choice[] classChoices = Arrays.stream(classNames)
+            .map(name -> new Command.Choice(name, name))
+            .toArray(Command.Choice[]::new);
+
 }
