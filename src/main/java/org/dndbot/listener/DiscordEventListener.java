@@ -4,11 +4,20 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.requests.restaction.CommandListUpdateAction;
 import net.dv8tion.jda.api.sharding.ShardManager;
+import org.dndbot.character.DnDChar;
 import org.jetbrains.annotations.NotNull;
 import org.dndbot.DnDBot;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+
+import java.io.IOException;
+import java.nio.file.*;
+import java.util.*;
 
 public class DiscordEventListener extends ListenerAdapter {
     public DnDBot bot;
@@ -29,6 +38,11 @@ public class DiscordEventListener extends ListenerAdapter {
             CommandListUpdateAction commands = g.updateCommands();
             commands.addCommands(Commands.slash("hello", "Have the bot say hello to you in an ephemeral message!")).queue();
             commands.addCommands(Commands.slash("d20", "Roll a d20")).queue();
+            commands.addCommands(Commands.slash("addchar", "Add a character")
+                    .addOptions(new OptionData(OptionType.STRING, "name", "Name your character", true),
+                            new OptionData(OptionType.STRING, "class", "Give your character a class", true)))
+                    .queue();
+
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
         }
@@ -44,6 +58,32 @@ public class DiscordEventListener extends ListenerAdapter {
         if (event.getName().equals("d20")) {
             event.reply("Your d20 roll is: " + ((int)(Math.random() * 20)+ 1)) // What will we reply with?
                     .queue(); // Queue the reply.
+        }
+        if (event.getName().equals("addchar")) {
+            String charName = event.getOption("name").getAsString();
+            String DnDClass = event.getOption("class").getAsString();
+            Long userId = event.getUser().getIdLong();
+            DnDChar character = new DnDChar(charName, DnDClass, userId);
+
+            // Serialize and save character to characters.json
+            ObjectMapper mapper = new ObjectMapper();
+            Path filePath = Paths.get("characters.json");
+            List<DnDChar> characters = new ArrayList<>();
+            System.out.println("Saving to: " + filePath.toAbsolutePath());
+
+            try {
+                if (Files.exists(filePath)) {
+                    characters = mapper.readValue(filePath.toFile(), new TypeReference<List<DnDChar>>() {});
+                }
+                characters.add(character);
+                mapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), characters);
+                event.reply("Character has been created... maybe    ") // What will we reply with?
+                        .queue(); // Queue the reply.
+            } catch (IOException e) {
+                e.printStackTrace();
+                event.reply("Failed to save character: " + e.getMessage()).queue();
+            }
+
         }
     }
 }

@@ -23,6 +23,8 @@ dependencies {
     // https://mvnrepository.com/artifact/commons-cli/commons-cli - Additional CLI library for argument parsing
     implementation("commons-cli:commons-cli:1.5.0")
 
+    implementation ("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+
 }
 
 tasks.test {
