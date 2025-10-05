@@ -63,4 +63,8 @@ public class DnDAPI {
         }
         return names;
     }
+
+    public static String getItem(String itemName) {
+        return getInfo("equipment/" + itemName.toLowerCase().replace(" ", "-"));
+    }
 }
