@@ -3,7 +3,7 @@ package org.dndbot.character;
 public class DnDChar {
     private String name;
     private String DnDClass;
-    private long DiscordID;
+    private long UserId;
 
     private int strength, dexterity, constitution, intelligence, wisdom, charisma;
 
@@ -12,7 +12,7 @@ public class DnDChar {
     public DnDChar(String name, String DnDClass, long DiscordID) {
         this.name = name;
         this.DnDClass = DnDClass;
-        this.DiscordID = DiscordID;
+        this.UserId = DiscordID;
         // Default stats
         strength = 10;
         dexterity = 10;
@@ -22,10 +22,10 @@ public class DnDChar {
         charisma = 10;
     }
 
-    public DnDChar(String name, String DnDClass, long DiscordID, int strength, int dexterity, int constitution, int intelligence, int wisdom, int charisma) {
+    public DnDChar(String name, String DnDClass, long UserId, int strength, int dexterity, int constitution, int intelligence, int wisdom, int charisma) {
         this.name = name;
         this.DnDClass = DnDClass;
-        this.DiscordID = DiscordID;
+        this.UserId = UserId;
         this.strength = strength;
         this.dexterity = dexterity;
         this.constitution = constitution;
@@ -42,8 +42,8 @@ public class DnDChar {
         return DnDClass;
     }
 
-    public long getDiscordID() {
-        return DiscordID;
+    public long getUserId() {
+        return UserId;
     }
 
     public int getStrength() {
@@ -78,8 +78,8 @@ public class DnDChar {
         this.DnDClass = DnDClass;
     }
 
-    public void setDiscordID(long DiscordID) {
-        this.DiscordID = DiscordID;
+    public void setUserId(long UserId) {
+        this.UserId = UserId;
     }
 
     public void setStrength(int strength) {

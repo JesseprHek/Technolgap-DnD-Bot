@@ -42,6 +42,9 @@ public class DiscordEventListener extends ListenerAdapter {
                     .addOptions(new OptionData(OptionType.STRING, "name", "Name your character", true),
                             new OptionData(OptionType.STRING, "class", "Give your character a class", true)))
                     .queue();
+            commands.addCommands(Commands.slash("charsheet", "Retrieve your character sheet")
+                    .addOptions(new OptionData(OptionType.STRING, "name", "Name of your character", true)))
+                    .queue();
 
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
@@ -72,18 +75,51 @@ public class DiscordEventListener extends ListenerAdapter {
             System.out.println("Saving to: " + filePath.toAbsolutePath());
 
             try {
-                if (Files.exists(filePath)) {
-                    characters = mapper.readValue(filePath.toFile(), new TypeReference<List<DnDChar>>() {});
+                if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                    characters = mapper.readValue(filePath.toFile(), new com.fasterxml.jackson.core.type.TypeReference<List<DnDChar>>() {});
                 }
                 characters.add(character);
                 mapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), characters);
-                event.reply("Character has been created... maybe    ") // What will we reply with?
-                        .queue(); // Queue the reply.
+                event.reply("Character has been created!").queue();
             } catch (IOException e) {
                 e.printStackTrace();
                 event.reply("Failed to save character: " + e.getMessage()).queue();
             }
-
+        }
+        if (event.getName().equals("charsheet")) {
+            String charName = event.getOption("name").getAsString();
+            Long userId = event.getUser().getIdLong();
+            ObjectMapper mapper = new ObjectMapper();
+            Path filePath = Paths.get("characters.json");
+            List<DnDChar> characters = new ArrayList<>();
+            try {
+                if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                    characters = mapper.readValue(filePath.toFile(), new com.fasterxml.jackson.core.type.TypeReference<List<DnDChar>>() {});
+                }
+                Optional<DnDChar> found = characters.stream()
+                        .filter(c -> c.getName().equalsIgnoreCase(charName) && c.getUserId() == (userId))
+                        .findFirst();
+                if (found.isPresent()) {
+                    DnDChar c = found.get();
+                    net.dv8tion.jda.api.EmbedBuilder eb = new net.dv8tion.jda.api.EmbedBuilder();
+                    eb.setTitle("Character Sheet: " + c.getName());
+                    eb.addField("Class", c.getDnDClass(), true);
+                    eb.addField("Owner", "<@" + c.getUserId() + ">", true);
+                    eb.addBlankField(false);
+                    eb.addField("Strength", String.valueOf(c.getStrength()), true);
+                    eb.addField("Dexterity", String.valueOf(c.getDexterity()), true);
+                    eb.addField("Constitution", String.valueOf(c.getConstitution()), true);
+                    eb.addField("Intelligence", String.valueOf(c.getIntelligence()), true);
+                    eb.addField("Wisdom", String.valueOf(c.getWisdom()), true);
+                    eb.addField("Charisma", String.valueOf(c.getCharisma()), true);
+                    event.replyEmbeds(eb.build()).queue();
+                } else {
+                    event.reply("Character not found or you do not own this character.").setEphemeral(true).queue();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                event.reply("Failed to load character: " + e.getMessage()).queue();
+            }
         }
     }
 }
