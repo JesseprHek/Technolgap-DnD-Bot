@@ -8,10 +8,15 @@ import java.net.URL;
 public class DnDAPI {
 
     public static void main(String[] args) {
-        getInfo("classes");
+        System.out.println(getClass("WIZARD"));
+
     }
 
-    public static void getInfo(String path){
+    public static String getClass(String className) {
+        return getInfo("classes/" + className.toLowerCase());
+    }
+
+    public static String getInfo(String path){
         String apiUrl = "https://www.dnd5eapi.co/api/2014/" + path;
         StringBuilder jsonResult = new StringBuilder();
 
@@ -30,10 +35,11 @@ public class DnDAPI {
             // Store the JSON result as a String
             String jsonData = jsonResult.toString();
             // You can now use jsonData as needed
-            System.out.println(jsonData);
+            return jsonData;
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return ("Item not found at path: " + path + ". Please check the spelling and try again.");
     }
 }
