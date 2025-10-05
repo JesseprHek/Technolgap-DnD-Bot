@@ -14,17 +14,17 @@ public class DnDAPI {
 
     }
     public static String[] getAllClasses() {
-        String jsonData = getInfo("classes");
+        JSONObject jsonData = getInfo("classes");
         // You can now use jsonData as needed
-        // This will return a JSON string containing all classes
-        return new String[]{jsonData};
+        // This will return a JSON object containing all classes
+        return new String[]{jsonData.toString()};
     }
 
     public static String getClass(String className) {
-        return getInfo("classes/" + className.toLowerCase());
+        return getInfo("classes/" + className.toLowerCase()).toString();
     }
 
-    public static String getInfo(String path){
+    public static JSONObject getInfo(String path){
         String apiUrl = "https://www.dnd5eapi.co/api/2014/" + path;
         StringBuilder jsonResult = new StringBuilder();
 
@@ -42,20 +42,22 @@ public class DnDAPI {
 
             // Store the JSON result as a String
             String jsonData = jsonResult.toString();
-            // You can now use jsonData as needed
-            return jsonData;
+            // Return as JSONObject
+            return new JSONObject(jsonData);
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return ("Item not found at path: " + path + ". Please check the spelling and try again.");
+        // Return an empty object with an error message
+        JSONObject error = new JSONObject();
+        error.put("error", "Item not found at path: " + path + ". Please check the spelling and try again.");
+        return error;
     }
 
 
 
     public static String[] getClassNames() {
-        String jsonData = getInfo("classes");
-        JSONObject jsonObject = new JSONObject(jsonData);
+        JSONObject jsonObject = getInfo("classes");
         JSONArray results = jsonObject.getJSONArray("results");
         String[] names = new String[results.length()];
         for (int i = 0; i < results.length(); i++) {
@@ -64,7 +66,12 @@ public class DnDAPI {
         return names;
     }
 
-    public static String getItem(String itemName) {
-        return getInfo("equipment/" + itemName.toLowerCase().replace(" ", "-"));
+    public static JSONObject getItem(String itemName) {
+        JSONObject result = getInfo("equipment/" + itemName.toLowerCase().replace(" ", "-"));
+        if (result.has("error")) {
+            // Try magic-items if not found in equipment
+            result = getInfo("magic-items/" + itemName.toLowerCase().replace(" ", "-"));
+        }
+        return result;
     }
 }

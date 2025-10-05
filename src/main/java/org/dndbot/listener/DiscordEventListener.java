@@ -47,6 +47,9 @@ public class DiscordEventListener extends ListenerAdapter {
             commands.addCommands(Commands.slash("charsheet", "Retrieve your character sheet")
                     .addOptions(new OptionData(OptionType.STRING, "name", "Name of your character", true)))
                     .queue();
+            commands.addCommands(Commands.slash("getitem", "Get information about a D&D item")
+                    .addOptions(new OptionData(OptionType.STRING, "item", "Name of the item", true)))
+                    .queue();
 
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
@@ -123,6 +126,96 @@ public class DiscordEventListener extends ListenerAdapter {
                 event.reply("Failed to load character: " + e.getMessage()).queue();
             }
         }
+        if (event.getName().equals("getitem")) {
+            String itemName = event.getOption("item").getAsString();
+            org.json.JSONObject item = DnDAPI.getItem(itemName);
+            if (item != null && !item.has("error")) {
+                net.dv8tion.jda.api.EmbedBuilder eb = new net.dv8tion.jda.api.EmbedBuilder();
+                eb.setTitle(item.optString("name", "Unknown Item"));
+                String category = item.has("equipment_category") ? item.getJSONObject("equipment_category").optString("name", "-") : "-";
+                String gearCategory = item.has("gear_category") ? item.getJSONObject("gear_category").optString("name", "-") : "-";
+                String cost = item.has("cost") ? (item.getJSONObject("cost").optInt("quantity", 0) + " " + item.getJSONObject("cost").optString("unit", "")) : "-";
+                String weight = item.has("weight") ? String.valueOf(item.get("weight")) : "-";
+                String desc = "-";
+                if (item.has("desc")) {
+                    org.json.JSONArray descArr = item.getJSONArray("desc");
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < descArr.length(); i++) {
+                        sb.append(descArr.getString(i)).append("\n");
+                    }
+                    desc = sb.toString().trim();
+                }
+                eb.addField("Category", category, true);
+                if (!gearCategory.equals("-")) eb.addField("Gear Category", gearCategory, true);
+                eb.addField("Cost", cost, true);
+                eb.addField("Weight", weight, true);
+                // Weapon-specific fields
+                if (item.has("weapon_category")) {
+                    eb.addField("Weapon Category", item.optString("weapon_category", "-"), true);
+                }
+                if (item.has("weapon_range")) {
+                    eb.addField("Weapon Range", item.optString("weapon_range", "-"), true);
+                }
+                if (item.has("category_range")) {
+                    eb.addField("Category Range", item.optString("category_range", "-"), true);
+                }
+                if (item.has("damage")) {
+                    org.json.JSONObject dmg = item.getJSONObject("damage");
+                    String dmgStr = dmg.optString("damage_dice", "-");
+                    String dmgType = dmg.has("damage_type") ? dmg.getJSONObject("damage_type").optString("name", "-") : "-";
+                    eb.addField("Damage", dmgStr, true);
+                    eb.addField("Damage Type", dmgType, true);
+                }
+                if (item.has("range")) {
+                    org.json.JSONObject range = item.getJSONObject("range");
+                    String normal = range.has("normal") ? String.valueOf(range.get("normal")) : "-";
+                    String longR = range.has("long") ? String.valueOf(range.get("long")) : "-";
+                    eb.addField("Range", "Normal: " + normal + ", Long: " + longR, true);
+                }
+                if (item.has("properties")) {
+                    org.json.JSONArray props = item.getJSONArray("properties");
+                    if (props.length() > 0) {
+                        StringBuilder propList = new StringBuilder();
+                        for (int i = 0; i < props.length(); i++) {
+                            propList.append(props.getJSONObject(i).optString("name", "-"));
+                            if (i < props.length() - 1) propList.append(", ");
+                        }
+                        eb.addField("Properties", propList.toString(), false);
+                    }
+                }
+                if (item.has("vehicle_category")) {
+                    eb.addField("Vehicle Category", item.optString("vehicle_category", "-"), true);
+                }
+                if (item.has("speed")) {
+                    org.json.JSONObject speed = item.getJSONObject("speed");
+                    String speedStr = speed.optInt("quantity", 0) + " " + speed.optString("unit", "");
+                    eb.addField("Speed", speedStr, true);
+                }
+                if (item.has("capacity")) {
+                    eb.addField("Capacity", item.optString("capacity", "-"), true);
+                }
+                if (item.has("rarity")) {
+                    org.json.JSONObject rarity = item.getJSONObject("rarity");
+                    eb.addField("Rarity", rarity.optString("name", "-"), true);
+                }
+                if (item.has("image")) {
+                    String imageUrl = item.optString("image", null);
+                    if (imageUrl != null && !imageUrl.isEmpty()) {
+                        // Prepend the DnD 5e API base URL if needed
+                        if (imageUrl.startsWith("/")) {
+                            imageUrl = "https://www.dnd5eapi.co" + imageUrl;
+                        }
+                        eb.setThumbnail(imageUrl);
+                    }
+                }
+                eb.addField("Description", desc, false);
+                event.replyEmbeds(eb.build()).queue();
+            } else {
+                String errorMsg = item != null && item.has("error") ? item.getString("error") : "Item not found. Please check the item name and try again.";
+                event.reply(errorMsg).setEphemeral(true).queue();
+            }
+        }
+
     }
     String[] classNames = DnDAPI.getClassNames();
     Command.Choice[] classChoices = Arrays.stream(classNames)
