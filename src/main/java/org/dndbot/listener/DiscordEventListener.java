@@ -52,6 +52,20 @@ public class DiscordEventListener extends ListenerAdapter {
             commands.addCommands(Commands.slash("getitem", "Get information about a D&D item")
                     .addOptions(new OptionData(OptionType.STRING, "item", "Name of the item", true)))
                     .queue();
+            commands.addCommands(Commands.slash("check", "Perform an ability check")
+                    .addOptions(
+                        new OptionData(OptionType.STRING, "ability", "Ability to check", true)
+                            .addChoices(
+                                new Command.Choice("Strength", "strength"),
+                                new Command.Choice("Dexterity", "dexterity"),
+                                new Command.Choice("Constitution", "constitution"),
+                                new Command.Choice("Intelligence", "intelligence"),
+                                new Command.Choice("Wisdom", "wisdom"),
+                                new Command.Choice("Charisma", "charisma")
+                            ),
+                        new OptionData(OptionType.INTEGER, "dc", "Difficulty Class to beat (optional)", false)
+                    ))
+                    .queue();
             commands.addCommands(Commands.slash("additem", "Add an item to a character's inventory")
                     .addOptions(
                             new OptionData(OptionType.STRING, "charname", "Name of your character", true),
@@ -255,6 +269,52 @@ public class DiscordEventListener extends ListenerAdapter {
                 event.reply("Failed to set stat: " + e.getMessage()).queue();
             }
         }
+        if (event.getName().equals("check")) {
+            String ability = event.getOption("ability").getAsString();
+            Long userId = event.getUser().getIdLong();
+            Integer dc = event.getOption("dc") != null ? event.getOption("dc").getAsInt() : null;
+            ObjectMapper mapper = new ObjectMapper();
+            Path filePath = Paths.get("characters.json");
+            List<DnDChar> characters = new ArrayList<>();
+            try {
+                if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                    characters = mapper.readValue(filePath.toFile(), new com.fasterxml.jackson.core.type.TypeReference<List<DnDChar>>() {});
+                }
+                Optional<DnDChar> found = characters.stream()
+                        .filter(c -> c.getUserId() == userId)
+                        .findFirst();
+                if (found.isPresent()) {
+                    DnDChar c = found.get();
+                    int statValue;
+                    switch (ability.toLowerCase()) {
+                        case "strength": statValue = c.getStrength(); break;
+                        case "dexterity": statValue = c.getDexterity(); break;
+                        case "constitution": statValue = c.getConstitution(); break;
+                        case "intelligence": statValue = c.getIntelligence(); break;
+                        case "wisdom": statValue = c.getWisdom(); break;
+                        case "charisma": statValue = c.getCharisma(); break;
+                        default: statValue = 10; // fallback
+                    }
+                    int modifier = (int) Math.floor((statValue - 10) / 2.0);
+                    int roll = (int)(Math.random() * 20) + 1;
+                    int total = roll + modifier;
+                    String modStr = (modifier >= 0 ? "+" : "") + modifier;
+                    if (dc != null) {
+                        boolean success = total >= dc;
+                        String result = success ? "**Success!**" : "**Failure.**";
+                        event.reply(String.format("Your %s check roll is: %d %s %d = %d (Stat: %d, Modifier: %s)\nDC: %d\nResult: %s", ability, roll, (modifier >= 0 ? "+" : "-"), Math.abs(modifier), total, statValue, modStr, dc, result)).queue();
+                    } else {
+                        event.reply(String.format("Your %s check roll is: %d %s %d = %d (Stat: %d, Modifier: %s)", ability, roll, (modifier >= 0 ? "+" : "-"), Math.abs(modifier), total, statValue, modStr)).queue();
+                    }
+                } else {
+                    event.reply("No character found for your Discord ID. Please create a character first.").setEphemeral(true).queue();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                event.reply("Failed to load character: " + e.getMessage()).queue();
+            }
+            }
+
 
     }
     String[] classNames = DnDAPI.getClassNames();
@@ -389,4 +449,6 @@ public class DiscordEventListener extends ListenerAdapter {
         }
         return eb;
     }
+}
+
 }
