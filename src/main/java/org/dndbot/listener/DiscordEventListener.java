@@ -85,6 +85,12 @@ public class DiscordEventListener extends ListenerAdapter {
                             new OptionData(OptionType.INTEGER, "value", "New value for the stat", true)
                     )
             ).queue();
+            commands.addCommands(Commands.slash("setpronouns", "Set pronouns for a character")
+                    .addOptions(
+                            new OptionData(OptionType.STRING, "charname", "Name of your character", true),
+                            new OptionData(OptionType.STRING, "pronouns", "Pronouns (e.g. she/her, he/him, they/them)", true)
+                    )
+            ).queue();
 
             // All slash commands must be added here. They follow a strict set of rules and are not as flexible as text commands.
             // Since we only need a simple command, we will only use a slash command without any arguments.
@@ -145,6 +151,9 @@ public class DiscordEventListener extends ListenerAdapter {
                     eb.setTitle("Character Sheet: " + c.getName());
                     eb.addField("Class", c.getDnDClass(), true);
                     eb.addField("Owner", "<@" + c.getUserId() + ">", true);
+                    if (c.getPronouns() != null && !c.getPronouns().isEmpty()) {
+                        eb.addField("Pronouns", c.getPronouns(), true);
+                    }
                     eb.addBlankField(false);
                     eb.addField("Strength", String.valueOf(c.getStrength()), true);
                     eb.addField("Dexterity", String.valueOf(c.getDexterity()), true);
@@ -267,6 +276,33 @@ public class DiscordEventListener extends ListenerAdapter {
             } catch (IOException e) {
                 e.printStackTrace();
                 event.reply("Failed to set stat: " + e.getMessage()).queue();
+            }
+        }
+        if (event.getName().equals("setpronouns")) {
+            String charName = event.getOption("charname").getAsString();
+            String pronouns = event.getOption("pronouns").getAsString();
+            Long userId = event.getUser().getIdLong();
+            ObjectMapper mapper = new ObjectMapper();
+            Path filePath = Paths.get("characters.json");
+            List<DnDChar> characters = new ArrayList<>();
+            try {
+                if (Files.exists(filePath) && Files.size(filePath) > 0) {
+                    characters = mapper.readValue(filePath.toFile(), new com.fasterxml.jackson.core.type.TypeReference<List<DnDChar>>() {});
+                }
+                Optional<DnDChar> found = characters.stream()
+                        .filter(c -> c.getName().equalsIgnoreCase(charName) && c.getUserId() == userId)
+                        .findFirst();
+                if (found.isPresent()) {
+                    DnDChar c = found.get();
+                    c.setPronouns(pronouns);
+                    mapper.writerWithDefaultPrettyPrinter().writeValue(filePath.toFile(), characters);
+                    event.reply("Set pronouns for " + c.getName() + " to '" + pronouns + "'.").queue();
+                } else {
+                    event.reply("Character not found or you do not own this character.").setEphemeral(true).queue();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+                event.reply("Failed to set pronouns: " + e.getMessage()).queue();
             }
         }
         if (event.getName().equals("check")) {
@@ -449,6 +485,4 @@ public class DiscordEventListener extends ListenerAdapter {
         }
         return eb;
     }
-}
-
 }

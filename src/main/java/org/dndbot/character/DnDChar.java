@@ -7,6 +7,7 @@ public class DnDChar {
     private String name;
     private String DnDClass;
     private long UserId;
+    private String pronouns;
 
     private int strength, dexterity, constitution, intelligence, wisdom, charisma;
 
@@ -14,6 +15,7 @@ public class DnDChar {
 
     public DnDChar() {
         inventory = new ArrayList<>();
+        pronouns = null;
     }
 
     public DnDChar(String name, String DnDClass, long DiscordID) {
@@ -28,6 +30,7 @@ public class DnDChar {
         wisdom = 10;
         charisma = 10;
         inventory = new ArrayList<>();
+        pronouns = null;
     }
 
     public DnDChar(String name, String DnDClass, long UserId, int strength, int dexterity, int constitution, int intelligence, int wisdom, int charisma) {
@@ -41,6 +44,7 @@ public class DnDChar {
         this.wisdom = wisdom;
         this.charisma = charisma;
         inventory = new ArrayList<>();
+        pronouns = null;
     }
 
     public String getName() {
@@ -83,6 +87,10 @@ public class DnDChar {
         return inventory;
     }
 
+    public String getPronouns() {
+        return pronouns;
+    }
+
     public void setName(String name) {
         this.name = name;
     }
@@ -121,5 +129,9 @@ public class DnDChar {
 
     public void setInventory(List<String> inventory) {
         this.inventory = inventory;
+    }
+
+    public void setPronouns(String pronouns) {
+        this.pronouns = pronouns;
     }
 }
